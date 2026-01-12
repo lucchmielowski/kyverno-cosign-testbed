@@ -22,8 +22,12 @@ Container images for testing GitHub attestations and Kyverno's cosign verificati
 ### GitHub Attestation
 
 ```bash
-gh attestation verify oci://ghcr.io/lucchmielowski/cosign-testbed:latest \
-  --owner lucchmielowski
+# Using cosign to verify GitHub build provenance attestation (SLSA v1.0)
+cosign verify-attestation \
+  --type https://slsa.dev/provenance/v1 \
+  --certificate-identity=https://github.com/lucchmielowski/cosign-testbed/.github/workflows/ci.yml@refs/heads/main \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+  ghcr.io/lucchmielowski/cosign-testbed:latest
 ```
 
 ### Cosign Key-Based Signatures
@@ -44,13 +48,13 @@ cosign verify --key cosign.pub ghcr.io/lucchmielowski/cosign-testbed:v3-bundle
 ```bash
 # v2-keyless (verify with GitHub Actions OIDC identity)
 cosign verify \
-  --certificate-identity=https://github.com/lucchmielowski/gh-attestation-test/.github/workflows/ci.yml@refs/heads/main \
+  --certificate-identity=https://github.com/lucchmielowski/cosign-testbed/.github/workflows/ci.yml@refs/heads/main \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
   ghcr.io/lucchmielowski/cosign-testbed:v2-keyless
 
 # v3-keyless (verify with GitHub Actions OIDC identity)
 cosign verify \
-  --certificate-identity=https://github.com/lucchmielowski/gh-attestation-test/.github/workflows/ci.yml@refs/heads/main \
+  --certificate-identity=https://github.com/lucchmielowski/cosign-testbed/.github/workflows/ci.yml@refs/heads/main \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
   ghcr.io/lucchmielowski/cosign-testbed:v3-keyless
 ```

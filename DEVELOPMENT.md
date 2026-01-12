@@ -140,7 +140,7 @@ spec:
         attestors:
         - entries:
           - keyless:
-              subject: "https://github.com/lucchmielowski/gh-attestation-test/.github/workflows/ci.yml@refs/heads/main"
+              subject: "https://github.com/lucchmielowski/cosign-testbed/.github/workflows/ci.yml@refs/heads/main"
               issuer: "https://token.actions.githubusercontent.com"
               rekor:
                 url: https://rekor.sigstore.dev
@@ -157,7 +157,7 @@ spec:
         attestors:
         - entries:
           - keyless:
-              subject: "https://github.com/lucchmielowski/gh-attestation-test/.github/workflows/ci.yml@refs/heads/main"
+              subject: "https://github.com/lucchmielowski/cosign-testbed/.github/workflows/ci.yml@refs/heads/main"
               issuer: "https://token.actions.githubusercontent.com"
               rekor:
                 url: https://rekor.sigstore.dev
