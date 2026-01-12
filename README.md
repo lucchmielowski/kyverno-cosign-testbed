@@ -1,83 +1,32 @@
-# GitHub Attestation & Cosign Test Repository
+# Cosign Testbed
 
-This repository builds container images for testing GitHub attestations and Kyverno's cosign verification.
+Container images for testing GitHub attestations and Kyverno's cosign verification.
 
-## Images Produced
+**Registry:** `ghcr.io/lucchmielowski/cosign-testbed`
 
-The CI workflow **automatically cleans up all existing images first**, then builds and pushes fresh images to `ghcr.io/lucchmielowski/gh-attestation-test`:
+## Available Images
 
 ### GitHub Attestation Images
 - **`:latest`** - Signed with GitHub build provenance attestation
 - **`:unsigned`** - No attestation or signature
 
-### Cosign Test Images (for Kyverno verification testing)
-- **`:v2-traditional`** - Signed with cosign v2.4.1 using traditional OCI signature manifests (key-based)
-- **`:v2-keyless`** - Signed with cosign v2.4.1 using keyless signing (Fulcio + Rekor)
-- **`:v3-traditional`** - Signed with cosign v3.0.4 using traditional format (default, backward compatible)
-- **`:v3-bundle`** - Signed with cosign v3.0.4 using NEW unified bundle format (stored as OCI referrer)
+### Cosign Test Images
+- **`:v2-traditional`** - Cosign v2.4.1 with key-based signing (traditional OCI signature manifests)
+- **`:v2-keyless`** - Cosign v2.4.1 with keyless signing (Fulcio + Rekor)
+- **`:v3-traditional`** - Cosign v3.0.4 with key-based signing (backward compatible with v2)
+- **`:v3-keyless`** - Cosign v3.0.4 with keyless signing (Fulcio + Rekor)
+- **`:v3-bundle`** - Cosign v3.0.4 with bundle format (`.sigstore.json` as OCI referrer)
 
-## Setup Instructions
+## Verification Methods
 
-### 1. Generate Cosign Key Pair
-
-If you don't have a cosign key pair yet, generate one locally:
-
-```bash
-cosign generate-key-pair
-```
-
-This creates:
-- `cosign.key` (private key)
-- `cosign.pub` (public key)
-
-You'll be prompted to set a password for the private key.
-
-### 2. Add GitHub Secrets
-
-Add the following secrets to your GitHub repository (Settings → Secrets and variables → Actions):
-
-**`COSIGN_PRIVATE_KEY`**
-```bash
-cat cosign.key
-```
-Copy the entire contents including `-----BEGIN ENCRYPTED COSIGN PRIVATE KEY-----` and `-----END ENCRYPTED COSIGN PRIVATE KEY-----`
-
-**`COSIGN_PASSWORD`**
-The password you set when generating the key pair.
-
-### 3. Commit Public Key (Optional)
-
-Optionally commit the public key to the repository for verification testing:
-
-```bash
-cp cosign.pub .
-git add cosign.pub
-git commit -m "Add cosign public key for verification"
-```
-
-### 4. Push and Run Workflow
-
-```bash
-git push
-```
-
-The GitHub Actions workflow will:
-1. **Clean up** all existing image versions from GHCR
-2. **Build and push** all 6 fresh images in parallel
-3. **Sign** the cosign images with the appropriate versions and methods
-
-## Verifying Signatures
-
-### Verify GitHub Attestation
+### GitHub Attestation
 
 ```bash
 gh attestation verify oci://ghcr.io/lucchmielowski/cosign-testbed:latest \
   --owner lucchmielowski
 ```
 
-### Verify Cosign Signatures
-
-#### Key-based signatures:
+### Cosign Key-Based Signatures
 
 ```bash
 # v2-traditional (verify with any cosign v2 or v3)
@@ -86,170 +35,40 @@ cosign verify --key cosign.pub ghcr.io/lucchmielowski/cosign-testbed:v2-traditio
 # v3-traditional (verify with cosign v3)
 cosign verify --key cosign.pub ghcr.io/lucchmielowski/cosign-testbed:v3-traditional
 
-# v3-bundle (verify with cosign v3, looks for .sigstore.json bundle)
+# v3-bundle (verify with cosign v3)
 cosign verify --key cosign.pub ghcr.io/lucchmielowski/cosign-testbed:v3-bundle
 ```
 
-#### Keyless signature (uses OIDC identity):
+### Cosign Keyless Signatures
 
 ```bash
-# v2-keyless (verify keyless signature with GitHub Actions OIDC identity)
+# v2-keyless (verify with GitHub Actions OIDC identity)
 cosign verify \
   --certificate-identity=https://github.com/lucchmielowski/gh-attestation-test/.github/workflows/ci.yml@refs/heads/main \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
   ghcr.io/lucchmielowski/cosign-testbed:v2-keyless
+
+# v3-keyless (verify with GitHub Actions OIDC identity)
+cosign verify \
+  --certificate-identity=https://github.com/lucchmielowski/gh-attestation-test/.github/workflows/ci.yml@refs/heads/main \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+  ghcr.io/lucchmielowski/cosign-testbed:v3-keyless
 ```
-
-## Using with Kyverno
-
-Create a Kyverno policy to test signature verification:
-
-### Key-based verification:
-
-```yaml
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
-metadata:
-  name: verify-cosign-key-based
-spec:
-  validationFailureAction: Enforce
-  rules:
-    - name: verify-v2-traditional
-      match:
-        any:
-        - resources:
-            kinds:
-            - Pod
-      verifyImages:
-      - imageReferences:
-        - "ghcr.io/lucchmielowski/cosign-testbed:v2-traditional"
-        attestors:
-        - entries:
-          - keys:
-              publicKeys: |-
-                -----BEGIN PUBLIC KEY-----
-                <YOUR_COSIGN_PUB_CONTENT>
-                -----END PUBLIC KEY-----
-    
-    - name: verify-v3-bundle
-      match:
-        any:
-        - resources:
-            kinds:
-            - Pod
-      verifyImages:
-      - imageReferences:
-        - "ghcr.io/lucchmielowski/cosign-testbed:v3-bundle"
-        attestors:
-        - entries:
-          - keys:
-              publicKeys: |-
-                -----BEGIN PUBLIC KEY-----
-                <YOUR_COSIGN_PUB_CONTENT>
-                -----END PUBLIC KEY-----
-```
-
-### Keyless verification:
-
-```yaml
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
-metadata:
-  name: verify-cosign-keyless
-spec:
-  validationFailureAction: Enforce
-  rules:
-    - name: verify-v2-keyless
-      match:
-        any:
-        - resources:
-            kinds:
-            - Pod
-      verifyImages:
-      - imageReferences:
-        - "ghcr.io/lucchmielowski/cosign-testbed:v2-keyless"
-        attestors:
-        - entries:
-          - keyless:
-              subject: "https://github.com/lucchmielowski/gh-attestation-test/.github/workflows/ci.yml@refs/heads/main"
-              issuer: "https://token.actions.githubusercontent.com"
-              rekor:
-                url: https://rekor.sigstore.dev
-```
-
-## Testing Locally
-
-Build and test locally:
-
-```bash
-# Build image
-docker build -t test-image:local .
-
-# Generate key pair
-cosign generate-key-pair
-
-# Sign with different formats
-cosign sign --key cosign.key test-image:local
-cosign sign --key cosign.key --bundle test-image:local
-
-# Verify
-cosign verify --key cosign.pub test-image:local
-```
-
-## Troubleshooting
-
-### "Error: signing [image]: getting signer: reading key: no PEM block found"
-
-Make sure the `COSIGN_PRIVATE_KEY` secret contains the full key including headers:
-```
------BEGIN ENCRYPTED COSIGN PRIVATE KEY-----
-...
------END ENCRYPTED COSIGN PRIVATE KEY-----
-```
-
-### "Error: password required"
-
-Ensure `COSIGN_PASSWORD` secret is set correctly.
-
-### Bundle signature not found
-
-The `--bundle` flag in cosign v3 creates a `.sigstore.json` referrer. Make sure you're using cosign v3.0+ to verify bundle signatures.
-
-## Cleanup
-
-> **Note:** The CI workflow automatically cleans up all images before building new ones. Manual cleanup is only needed if you want to delete images without rebuilding.
-
-### Option 1: Manual GitHub Actions Workflow
-
-Go to **Actions → Cleanup GHCR Images → Run workflow**
-
-1. Click "Run workflow"
-2. Type `DELETE` in the confirmation field
-3. Click "Run workflow"
-
-This will delete all versions of the image from GHCR.
-
-### Option 2: Local Script
-
-```bash
-./cleanup-ghcr.sh
-```
-
-Requirements:
-- GitHub CLI (`gh`) installed and authenticated
-- Type `DELETE` when prompted to confirm
-
-The script will:
-- List all image versions
-- Delete each version from GHCR
-- Show a summary of deleted/failed versions
 
 ## Purpose
 
-- **`:latest` / `:unsigned`**: Test GitHub native attestations vs unsigned images
-- **`:v2-traditional`**: Test Kyverno compatibility with cosign v2 key-based signatures
-- **`:v2-keyless`**: Test Kyverno with cosign v2 keyless signing (Fulcio + Rekor)
-- **`:v3-traditional`**: Test Kyverno with cosign v3 default behavior (backward compatible)
-- **`:v3-bundle`**: Test Kyverno with NEW cosign v3 bundle format verification
+This testbed provides comprehensive coverage for testing signature verification:
 
-This allows comprehensive testing of signature verification across different cosign versions, formats, and signing methods (key-based vs keyless).
+| Image | Purpose |
+|-------|---------|
+| `:latest` | GitHub native attestations |
+| `:unsigned` | Unsigned baseline for comparison |
+| `:v2-traditional` | Cosign v2 key-based (traditional) |
+| `:v2-keyless` | Cosign v2 keyless (Fulcio/Rekor) |
+| `:v3-traditional` | Cosign v3 key-based (traditional) |
+| `:v3-keyless` | Cosign v3 keyless (Fulcio/Rekor) |
+| `:v3-bundle` | Cosign v3 key-based (bundle format) |
+
+---
+
+**For setup instructions, see [DEVELOPMENT.md](DEVELOPMENT.md)**
