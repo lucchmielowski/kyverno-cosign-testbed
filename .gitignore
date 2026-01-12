@@ -1,0 +1,12 @@
+# Cosign private key - NEVER commit this!
+cosign.key
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

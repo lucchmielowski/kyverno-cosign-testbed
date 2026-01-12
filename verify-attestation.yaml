@@ -1,6 +1,8 @@
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
+  annotations:
+    pod-policies.kyverno.io/autogen-controllers: none
   name: sigstore-attestation-verification
 spec:
   background: false
@@ -25,7 +27,7 @@ spec:
               subjectRegExp: https://github\.com\/company\/.+
               rekor:
                 ignoreTlog: true
-                url: https://fulcio.githubapp.com
+                url: https://rekor.sigstore.dev
         conditions:
         - all:
           - key: '{{ buildDefinition.buildType }}'
