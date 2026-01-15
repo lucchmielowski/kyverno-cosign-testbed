@@ -80,7 +80,7 @@ jobs:
             IMAGE_TYPE=signed
 
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
