@@ -1,3 +1,4 @@
+# Verify image that was signed with a github attestation
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
 metadata:

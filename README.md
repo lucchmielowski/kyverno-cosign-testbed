@@ -10,7 +10,8 @@ Container images for testing GitHub attestations and Kyverno's cosign verificati
 
 | Image Tag | Cosign Version | Signing Method | Artifacts Created | Notes |
 |-----------|----------------|----------------|-------------------|-------|
-| `:latest` | N/A | GitHub Attestation | SLSA v1.0 build provenance attestation | Native GitHub attestation |
+| `:github-attestation` | N/A | GitHub Attestation | SLSA v1.0 build provenance attestation | Native GitHub attestation |
+| `:github-sbom` | N/A | GitHub Attestation | SPDX SBOM attestation | Software Bill of Materials attestation |
 | `:unsigned` | N/A | None | No signatures | Baseline for comparison |
 | `:v2-traditional` | v2.4.1 | Key-based (by tag) | Traditional OCI signature manifest (`.sig` image) | Original cosign format |
 | `:v2-keyless` | v2.4.1 | Keyless OIDC (by tag) | Traditional OCI signature manifest + Fulcio cert + Rekor entry | Signature in transparency log |
@@ -20,21 +21,78 @@ Container images for testing GitHub attestations and Kyverno's cosign verificati
 
 **\*Note on v3-bundle:** Originally intended to demonstrate the cosign v3 bundle format (`.sigstore.json` as OCI referrer), but the `--bundle` flag has compatibility issues with multi-platform manifest lists. This image demonstrates digest-based signing instead, which ensures proper signature attachment to multi-architecture images.
 
+## Policy Compatibility Matrix
+
+The following table shows which sample policies work with which image types:
+
+| Policy File | Policy Type | Signing Method | `:github-attestation` | `:github-sbom` | `:v2-traditional` | `:v2-keyless` | `:v3-traditional` | `:v3-keyless` | `:v3-bundle` |
+|------------|-------------|----------------|:---------------------:|:--------------:|:-----------------:|:-------------:|:----------------:|:-------------:|:------------:|
+| `cpol.yaml` | ClusterPolicy | Keyless | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `cpol-key.yaml` | ClusterPolicy | Key-based | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `cpol-att.yaml` | ClusterPolicy | GitHub Attestation | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `cpol-sbom.yaml` | ClusterPolicy | GitHub SBOM | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `ivpol.yaml` | ImageValidatingPolicy | Keyless | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `ivpol-key.yaml` | ImageValidatingPolicy | Key-based | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| `ivpol-gh-att.yaml` | ImageValidatingPolicy | GitHub Attestation | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `ivpol-sbom.yaml` | ImageValidatingPolicy | GitHub SBOM | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+### Key Compatibility Rules:
+
+1. **ClusterPolicy (CPOL) Limitations:**
+   - ❌ **Does NOT support cosign v3** signatures (`:v3-traditional`, `:v3-keyless`, `:v3-bundle`)
+   - ❌ By extension, does not support GH attestations verification
+   - ✅ Only supports cosign v2 signatures (`:v2-traditional`, `:v2-keyless`)
+
+2. **ImageValidatingPolicy (IVPOL) Capabilities:**
+   - ✅ Supports both cosign v2 and v3 signatures
+   - ✅ Supports GitHub attestations (`:github-attestation`, `:github-sbom`)
+   - ✅ More flexible and recommended for newer Kyverno versions
+
+### Policy Files Location
+
+All sample policies are located in the [`sample-policies/`](sample-policies/) directory:
+
+**ClusterPolicy (CPOL) - v2 only:**
+- `cpol.yaml` - Keyless signatures (v2 only)
+- `cpol-key.yaml` - Key-based signatures (v2 only)
+- `cpol-att.yaml` - GitHub SLSA provenance attestations
+- `cpol-sbom.yaml` - GitHub SPDX SBOM attestations
+
+**ImageValidatingPolicy (IVPOL) - v2 & v3:**
+- `ivpol.yaml` - Keyless signatures (v2 & v3)
+- `ivpol-key.yaml` - Key-based signatures (v2 & v3)
+- `ivpol-gh-att.yaml` - GitHub SLSA provenance attestations
+- `ivpol-sbom.yaml` - GitHub SPDX SBOM attestations
+
+
 ## Important Notes
 
 **Multi-Platform Support:** All images are built as multi-platform images supporting both `linux/amd64` and `linux/arm64` architectures.
 
 ## Verification Methods
 
-### GitHub Attestation
+### GitHub Attestations
+
+**Build Provenance (SLSA v1.0):**
 
 ```bash
-# Using cosign to verify GitHub build provenance attestation (SLSA v1.0)
+# Using cosign to verify GitHub build provenance attestation
 cosign verify-attestation \
   --type https://slsa.dev/provenance/v1 \
   --certificate-identity=https://github.com/lucchmielowski/cosign-testbed/.github/workflows/ci.yml@refs/heads/main \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
-  ghcr.io/lucchmielowski/cosign-testbed:latest
+  ghcr.io/lucchmielowski/cosign-testbed:github-attestation
+```
+
+**SBOM (Software Bill of Materials):**
+
+```bash
+# Using cosign to verify GitHub SBOM attestation
+cosign verify-attestation \
+  --type https://spdx.dev/Document \
+  --certificate-identity=https://github.com/lucchmielowski/cosign-testbed/.github/workflows/ci.yml@refs/heads/main \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+  ghcr.io/lucchmielowski/cosign-testbed:github-sbom
 ```
 
 ### Cosign Key-Based Signatures
@@ -88,13 +146,18 @@ These use short-lived certificates from Fulcio (certificate authority) and store
 - Rekor transparency log entry
 
 ### GitHub Attestations
-Created by: `:latest`
+Created by: `:github-attestation`, `:github-sbom`
 
-Native GitHub attestations using SLSA v1.0 build provenance. Stored directly in GitHub's attestation registry.
+Native GitHub attestations stored directly in GitHub's attestation store and signed with GitHub's signing infrastructure.
 
-**Artifacts:**
-- SLSA build provenance attestation
-- Signed with GitHub's signing infrastructure
+**`:github-attestation` - Build Provenance:**
+- SLSA v1.0 build provenance attestation
+- Describes how the image was built (workflow, source, etc.)
+
+**`:github-sbom` - Software Bill of Materials:**
+- SPDX format SBOM attestation
+- Lists all packages, dependencies, and components in the image
+- Generated using Anchore's sbom-action
 
 ---
 

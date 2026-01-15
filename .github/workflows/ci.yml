@@ -56,7 +56,7 @@ jobs:
     needs: cleanup
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -75,15 +75,63 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ env.REGISTRY }}/${{env.IMAGE_NAME}}:latest
+          tags: ${{ env.REGISTRY }}/${{env.IMAGE_NAME}}:github-attestation
           build-args: |
-            IMAGE_TYPE=signed
+            IMAGE_TYPE=github-attestation
 
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  build-push-and-attest-sbom:
+    runs-on: ubuntu-latest
+    needs: cleanup
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.REGISTRY }}/${{env.IMAGE_NAME}}:github-sbom
+          build-args: |
+            IMAGE_TYPE=github-sbom
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Create SBOM attestation
+        uses: actions/attest-sbom@v3
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: sbom.spdx.json
           push-to-registry: true
 
   build-push-unsigned:
@@ -91,7 +139,7 @@ jobs:
     needs: cleanup
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -118,7 +166,7 @@ jobs:
     needs: cleanup
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -165,7 +213,7 @@ jobs:
       id-token: write  # Required for keyless signing with Fulcio
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -204,7 +252,7 @@ jobs:
     needs: cleanup
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -247,7 +295,7 @@ jobs:
     needs: cleanup
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -295,7 +343,7 @@ jobs:
       id-token: write  # Required for keyless signing with Fulcio
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

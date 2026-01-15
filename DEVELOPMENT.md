@@ -340,7 +340,8 @@ The workflow consists of 8 jobs:
 ```
 cleanup (runs first)
   ↓
-├─ build-push-and-attest (latest)
+├─ build-push-and-attest (github-attestation)
+├─ build-push-and-attest-sbom (github-sbom)
 ├─ build-push-unsigned (unsigned)
 ├─ build-sign-v2-traditional (v2-traditional)
 ├─ build-sign-v2-keyless (v2-keyless)
@@ -377,10 +378,13 @@ cleanup (runs first)
 - Verification requires checking Rekor transparency log
 
 **4. GitHub Attestations**
-- Used by: `:latest`
+- Used by: `:github-attestation` (build provenance), `:github-sbom` (SBOM)
 - Storage: GitHub's native attestation store
-- Format: SLSA v1.0 build provenance
+- Formats:
+  - `:github-attestation`: SLSA v1.0 build provenance
+  - `:github-sbom`: SPDX format Software Bill of Materials
 - Separate from OCI registry signatures
+- Both signed with GitHub's signing infrastructure
 
 **Note on v3-bundle:** Originally intended to demonstrate cosign v3's new bundle format, but currently uses traditional signature format with digest-based signing as a workaround for multi-platform compatibility.
 
@@ -388,7 +392,8 @@ cleanup (runs first)
 
 | Job | Image Tag | Cosign Version | Command | Artifacts Created |
 |-----|-----------|----------------|---------|-------------------|
-| `build-push-and-attest` | `:latest` | N/A | `actions/attest-build-provenance@v1` | SLSA v1.0 build provenance |
+| `build-push-and-attest` | `:github-attestation` | N/A | `actions/attest-build-provenance@v3` | SLSA v1.0 build provenance |
+| `build-push-and-attest-sbom` | `:github-sbom` | N/A | `anchore/sbom-action@v0` + `actions/attest-sbom@v3` | SPDX SBOM attestation |
 | `build-push-unsigned` | `:unsigned` | N/A | None | No signatures |
 | `build-sign-v2-traditional` | `:v2-traditional` | v2.4.1 | `cosign sign --key cosign.key --yes :v2-traditional` | Traditional `.sig` image |
 | `build-sign-v2-keyless` | `:v2-keyless` | v2.4.1 | `cosign sign --yes :v2-keyless` | `.sig` image + Fulcio cert + Rekor entry |
